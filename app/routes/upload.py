@@ -1,73 +1,39 @@
-import csv
 import os
+import csv
 from fastapi import APIRouter, HTTPException, UploadFile, File
-import numpy as np
-import pandas as pd
+from app.utils.file_operations import save_large_file
+from app.utils.data_validation import validate_csv_headers
+from app.utils.cleanup import cleanup_temp_files
 
 router = APIRouter()
 
-@router.post("/api/upload/")
+@router.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
+    """Endpoint to upload a CSV file."""
+    temp_dir = os.getenv("TEMP_DIR", "temp")
+    os.makedirs(temp_dir, exist_ok=True)
+
+    # Cleanup old files
+    cleanup_temp_files(temp_dir)
+
+    # Restrict file size
+    MAX_FILE_SIZE_MB = 25
+    file_size = len(await file.read())
+    await file.seek(0)
+    if file_size > MAX_FILE_SIZE_MB * 1024 * 1024:
+        raise HTTPException(status_code=400, detail=f"File is too large. Maximum size is {MAX_FILE_SIZE_MB}MB.")
+
     # Ensure the file is a CSV
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Invalid file type. Only .csv files are allowed.")
-    
-    # Save the file to a temporary directory
-    temp_dir = "temp"
-    os.makedirs(temp_dir, exist_ok=True)
-    file_path = os.path.join(temp_dir, file.filename)
 
-    with open(file_path, "wb") as f:
-        f.write(await file.read())
+    # Save the file in chunks
+    file_path = os.path.join(temp_dir, file.filename)
+    await save_large_file(file, file_path)
 
     # Validate the CSV structure
-    required_headers = [
-        "Product code", "Station Number", "Year",
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Annual"
-    ]
-
-    with open(file_path, "r") as f:
-        reader = csv.reader(f)
-        headers = next(reader)
-        if headers != required_headers:
-            raise HTTPException(status_code=400, detail="Invalid CSV headers. Please upload the correct file.")
+    if not validate_csv_headers(file_path):
+        os.remove(file_path)
+        raise HTTPException(status_code=400, detail="Invalid CSV headers. Please upload the correct file.")
 
     return {"message": "File uploaded successfully", "file_path": file_path}
-
-@router.get("/api/process/")
-def process_file(file_name: str):
-    file_path = os.path.join("temp", file_name)
-    
-    # Ensure the file exists
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found.")
-
-    # Load the CSV into a DataFrame
-    df = pd.read_csv(file_path)
-
-    # Validate the columns match the expected structure
-    required_columns = [
-        "Product code", "Station Number", "Year",
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Annual"
-    ]
-    if list(df.columns) != required_columns:
-        raise HTTPException(status_code=400, detail="Invalid CSV structure.")
-
-    # Handle missing or invalid data
-    df.replace([np.inf, -np.inf], np.nan, inplace=True)  # Replace infinite values with NaN
-    df.fillna(0, inplace=True)  # Replace NaN with 0 or another appropriate default
-
-    # Extract and compute yearly data
-    df["Yearly Average"] = df.iloc[:, 3:15].mean(axis=1)
-    df["Yearly StdDev"] = df.iloc[:, 3:15].std(axis=1)
-
-    # Prepare the response, ensuring JSON-safe values
-    response = {
-        "yearly_averages": df["Yearly Average"].fillna(0).replace({np.nan: 0}).tolist(),
-        "yearly_stddev": df["Yearly StdDev"].fillna(0).replace({np.nan: 0}).tolist(),
-        "years": df["Year"].tolist(),
-        "monthly_data": df.iloc[:, 3:15].fillna(0).replace({np.nan: 0}).to_dict(orient="list")
-    }
-    return response
