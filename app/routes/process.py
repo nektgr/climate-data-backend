@@ -22,19 +22,26 @@ def process_file(file_name: str):
     if not validate_csv_columns(df):
         raise HTTPException(status_code=400, detail="Invalid CSV structure.")
 
-    # Handle missing or invalid data
+    # Replace invalid values with NaN
     df.replace([float('inf'), -float('inf')], pd.NA, inplace=True)
-    df.fillna(0, inplace=True)
 
-    # Extract and compute yearly data
-    df["Yearly Average"] = df.iloc[:, 3:15].mean(axis=1)
-    df["Yearly StdDev"] = df.iloc[:, 3:15].std(axis=1)
+    # Compute monthly averages
+    monthly_columns = df.columns[3:15]
+    monthly_averages = df[monthly_columns].mean()
+
+    # Fill missing values with the respective monthly averages
+    for col in monthly_columns:
+        df[col].fillna(monthly_averages[col], inplace=True)
+
+    # Recalculate yearly data
+    df["Yearly Average"] = df[monthly_columns].mean(axis=1)
+    df["Yearly StdDev"] = df[monthly_columns].std(axis=1)
 
     # Prepare the response
     response = {
         "yearly_averages": df["Yearly Average"].tolist(),
         "yearly_stddev": df["Yearly StdDev"].tolist(),
         "years": df["Year"].tolist(),
-        "monthly_data": df.iloc[:, 3:15].to_dict(orient="list"),
+        "monthly_data": df[monthly_columns].to_dict(orient="list"),
     }
     return response
