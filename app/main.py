@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,6 +13,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(config.APP_NAME)
 
+# Define lifespan with cleanup logic
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context for FastAPI with startup and shutdown logic."""
+    try:
+        logger.info("Application is starting up...")
+        logger.info("Cleaning up temp files...")
+        cleanup_temp_files(config.TEMP_DIR, max_age_seconds=config.FILE_MAX_AGE_SECONDS)
+        yield  # Startup logic completed
+    finally:
+        logger.info("Application is shutting down...")
+# Define lifespan with cleanup logic
+# Define lifespan with cleanup logic
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context for FastAPI with startup and shutdown logic."""
+    try:
+        logger.info("Application is starting up...")
+        logger.info("Cleaning up temp files...")
+        cleanup_temp_files(config.TEMP_DIR, max_age_seconds=config.FILE_MAX_AGE_SECONDS)
+        yield  # Startup logic completed
+    finally:
+        logger.info("Application is shutting down...")
 # Initialize FastAPI app
 app = FastAPI(
     title=config.APP_NAME,
@@ -28,17 +52,7 @@ app.add_middleware(
     allow_headers=config.CORS_ALLOW_HEADERS,
 )
 
-@app.on_event("startup")
-def on_startup():
-    """Startup event to perform initial setup tasks."""
-    logger.info("Application is starting up...")
-    logger.info("Cleaning up temp files...")
-    cleanup_temp_files(config.TEMP_DIR, max_age_seconds=config.FILE_MAX_AGE_SECONDS)
 
-@app.on_event("shutdown")
-def on_shutdown():
-    """Shutdown event to perform cleanup tasks."""
-    logger.info("Application is shutting down...")
 
 @app.get("/")
 async def read_root():

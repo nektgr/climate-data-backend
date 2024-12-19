@@ -15,7 +15,8 @@ router = APIRouter()
 @router.get("/process/")
 def process_file(file_name: str):
     """Endpoint to process the uploaded CSV file."""
-    file_path = os.path.join(config.TEMP_DIR, file_name)
+    file_path = os.path.join(config.TEMP_DIR, os.path.basename(file_name))
+
 
     # Ensure the file exists
     if not os.path.exists(file_path):
