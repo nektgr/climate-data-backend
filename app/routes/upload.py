@@ -3,7 +3,6 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.utils.file_operations import save_large_file
 from app.utils.data_validation import validate_csv_headers
 from app.utils.cleanup import cleanup_temp_files
-
 from app.utils.exceptions import (
     file_not_found_error,
     invalid_csv_error,
@@ -15,15 +14,29 @@ from app.utils.exceptions import (
 )
 import logging
 from app.config import config
+
+# Set up logger
 logger = logging.getLogger(__name__)
 
+# Create API Router instance
 router = APIRouter()
 
 @router.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
-    """Endpoint to upload a CSV file."""
+    """
+    Endpoint to upload a CSV file.
+
+    Args:
+        file (UploadFile): The uploaded file to be processed.
+
+    Returns:
+        dict: A success message and the file path of the saved file.
+
+    Raises:
+        HTTPException: For file type, size, validation, or other errors.
+    """
     try:
-        # Create the temporary directory if it doesn't exist
+        # Ensure the temporary directory exists
         os.makedirs(config.TEMP_DIR, exist_ok=True)
 
         # Cleanup old files in the temporary directory
@@ -65,7 +78,7 @@ async def upload_file(file: UploadFile = File(...)):
         return {"message": "File uploaded successfully", "file_path": file_path}
 
     except HTTPException as http_exc:
-        # Pass through HTTP exceptions for proper client response
+        # Propagate HTTP exceptions for proper client response
         raise http_exc
     except Exception as e:
         # Log unexpected errors

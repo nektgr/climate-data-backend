@@ -16,31 +16,29 @@ logger = logging.getLogger(config.APP_NAME)
 # Define lifespan with cleanup logic
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan context for FastAPI with startup and shutdown logic."""
+    """
+    Lifespan context for FastAPI with startup and shutdown logic.
+
+    Args:
+        app (FastAPI): The FastAPI application instance.
+
+    Yields:
+        None: Indicates startup logic is complete.
+    """
     try:
         logger.info("Application is starting up...")
         logger.info("Cleaning up temp files...")
         cleanup_temp_files(config.TEMP_DIR, max_age_seconds=config.FILE_MAX_AGE_SECONDS)
-        yield  # Startup logic completed
+        yield
     finally:
         logger.info("Application is shutting down...")
-# Define lifespan with cleanup logic
-# Define lifespan with cleanup logic
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Lifespan context for FastAPI with startup and shutdown logic."""
-    try:
-        logger.info("Application is starting up...")
-        logger.info("Cleaning up temp files...")
-        cleanup_temp_files(config.TEMP_DIR, max_age_seconds=config.FILE_MAX_AGE_SECONDS)
-        yield  # Startup logic completed
-    finally:
-        logger.info("Application is shutting down...")
+
 # Initialize FastAPI app
 app = FastAPI(
     title=config.APP_NAME,
     version=config.VERSION,
-    debug=config.DEBUG
+    debug=config.DEBUG,
+    lifespan=lifespan,
 )
 
 # Add CORS Middleware
@@ -52,16 +50,19 @@ app.add_middleware(
     allow_headers=config.CORS_ALLOW_HEADERS,
 )
 
-
-
 @app.get("/")
 async def read_root():
-    """Root endpoint for health check."""
+    """
+    Root endpoint for health check.
+
+    Returns:
+        dict: A message indicating the API is running.
+    """
     return {
         "message": "Welcome to the Climate Data Backend :)",
         "app_name": config.APP_NAME,
         "version": config.VERSION,
-        "status": "Running"
+        "status": "Running",
     }
 
 # Include routes from the routes module

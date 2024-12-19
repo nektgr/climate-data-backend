@@ -10,13 +10,26 @@ import logging
 # Set up logger
 logger = logging.getLogger("app.routes.process")
 
+# Create API Router instance
 router = APIRouter()
 
 @router.get("/process/")
 def process_file(file_name: str):
-    """Endpoint to process the uploaded CSV file."""
-    file_path = os.path.join(config.TEMP_DIR, os.path.basename(file_name))
+    """
+    Endpoint to process the uploaded CSV file.
 
+    Args:
+        file_name (str): Name of the file to process.
+
+    Returns:
+        dict: Processed data including yearly averages, standard deviations, 
+              years, and monthly data.
+
+    Raises:
+        HTTPException: If file not found or invalid CSV structure.
+    """
+    # Construct the file path
+    file_path = os.path.join(config.TEMP_DIR, os.path.basename(file_name))
 
     # Ensure the file exists
     if not os.path.exists(file_path):
@@ -37,12 +50,12 @@ def process_file(file_name: str):
         df.replace([float('inf'), -float('inf')], pd.NA, inplace=True)
 
         # Compute monthly averages
-        monthly_columns = df.columns[3:15]
+        monthly_columns = df.columns[3:15]  # Assuming columns 3 to 15 are monthly data
         monthly_averages = df[monthly_columns].mean()
 
         # Fill missing values with the respective monthly averages
         for col in monthly_columns:
-            df.loc[:, col] = df[col].fillna(monthly_averages[col])
+            df[col] = df[col].fillna(monthly_averages[col])
             logger.debug(f"Filled missing values in column {col} with average {monthly_averages[col]}")
 
         # Recalculate yearly data
